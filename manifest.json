@@ -1,5 +1,5 @@
 {
-  "name": "Government Jobs Finder",
+  "name": "BD Government Jobs",
   "short_name": "GovtJobs",
   "start_url": "./",
   "display": "standalone",
@@ -18,3 +18,4 @@
     }
   ]
 }
+
