@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🇧🇩 Govt Jobs Finder</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png">
+  <style>
+    body{font-family:sans-serif;margin:0;padding:0;background:#f5f5f5;color:#222;}
+    header{background:#006747;color:#fff;text-align:center;padding:10px 0;position:sticky;top:0;z-index:100;}
+    #installBtn{display:none;margin-top:10px;background:#ffcc00;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;}
+    #badge{display:none;position:fixed;bottom:20px;right:20px;background:#ff4747;color:#fff;padding:10px 16px;
+      border-radius:30px;box-shadow:0 2px 10px rgba(0,0,0,0.3);font-weight:bold;cursor:pointer;}
+    .job-card{background:#fff;margin:10px;padding:10px;border-radius:10px;box-shadow:0 2px 4px rgba(0,0,0,0.1);}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🇧🇩 Government Jobs Finder</h1>
+  <input type="text" id="searchBox2" placeholder="🔍 Search Job Title..." style="padding:6px;width:60%;max-width:300px;">
+  <button id="searchBtn2">Search</button>
+  <button id="refreshBtn2">Refresh</button>
+  <button id="installBtn">📲 Install App</button>
+</header>
+
+<div id="container"></div>
+<div id="badge">🔔 New Jobs Added</div>
+
+<script>
+  const container=document.getElementById("container");
+  const badge=document.getElementById("badge");
+  const cachedKey="govt_jobs_cache";
+  let allJobs=[],visibleJobs=[],io,deferredPrompt;
+
+  /* ===== Fake Fetch Function (Replace With Real API) ===== */
+  async function fetchGovtJobs(){
+    const res=await fetch("https://bd-jobs-feed.vercel.app/api"); // ← তোমার API URL এখানে বসাও
+    return await res.json();
+  }
+
+  function renderNextBatch(){
+    const slice=allJobs.slice(visibleJobs.length,visibleJobs.length+20);
+    slice.forEach(job=>{
+      const div=document.createElement("div");
+      div.className="job-card";
+      div.innerHTML=`<h3>${job.title}</h3><p>${job.dept||""}</p><p>📍 ${job.location||"N/A"}</p>`;
+      container.appendChild(div);
+    });
+    visibleJobs=[...visibleJobs,...slice];
+  }
+
+  function saveCache(data){
+    localStorage.setItem(cachedKey,JSON.stringify({time:Date.now(),jobs:data}));
+  }
+  function loadCache(){
+    try{return JSON.parse(localStorage.getItem(cachedKey));}catch{return null;}
+  }
+
+  /* ====== Search ====== */
+  document.getElementById("searchBox2").addEventListener("input",()=>{
+    const s=document.getElementById("searchBox2").value.toLowerCase();
+    const filtered=allJobs.filter(j=>j.title.toLowerCase().includes(s));
+    container.innerHTML="";
+    visibleJobs=[];
+    filtered.forEach(j=>{
+      const div=document.createElement("div");
+      div.className="job-card";
+      div.innerHTML=`<h3>${j.title}</h3><p>${j.dept||""}</p><p>📍 ${j.location||"N/A"}</p>`;
+      container.appendChild(div);
+    });
+  });
+
+  /* ====== Search Button ====== */
+  document.getElementById("searchBtn2").onclick=()=>{
+    const s=document.getElementById("searchBox2").value.toLowerCase();
+    const filtered=allJobs.filter(j=>j.title.toLowerCase().includes(s));
+    container.innerHTML="";
+    visibleJobs=[];
+    filtered.forEach(j=>{
+      const div=document.createElement("div");
+      div.className="job-card";
+      div.innerHTML=`<h3>${j.title}</h3><p>${j.dept||""}</p><p>📍 ${j.location||"N/A"}</p>`;
+      container.appendChild(div);
+    });
+  };
+
+  /* ====== Refresh Button ====== */
+  document.getElementById("refreshBtn2").onclick=async()=>{
+    const fresh=await fetchGovtJobs();
+    if(fresh&&fresh.length){
+      allJobs=fresh;
+      saveCache(allJobs);
+      container.innerHTML="";
+      visibleJobs=[];
+      renderNextBatch();
+    }
+  };
+
+  /* ====== Auto Update Every 5 Minutes ====== */
+  async function autoUpdate(){
+    try{
+      const fresh=await fetchGovtJobs();
+      if(!fresh||!fresh.length)return;
+      const oldIds=new Set(allJobs.map(j=>j.id));
+      const newOnes=fresh.filter(j=>!oldIds.has(j.id));
+      if(newOnes.length>0){
+        allJobs=fresh;
+        saveCache(allJobs);
+        badge.style.display="block"; // 🔔 Show badge
+        badge.onclick=()=>{
+          badge.style.display="none";
+          container.innerHTML="";
+          visibleJobs=[];
+          renderNextBatch();
+        };
+      }
+    }catch(err){console.log("Auto update failed:",err);}
+  }
+  setInterval(autoUpdate,5*60*1000);
+
+  /* ===== Initial Load ===== */
+  async function init(){
+    const cached=loadCache();
+    if(cached&&cached.jobs&&cached.jobs.length){
+      allJobs=cached.jobs;
+      renderNextBatch();
+    }
+    const fresh=await fetchGovtJobs();
+    if(fresh&&fresh.length){
+      allJobs=fresh; saveCache(allJobs);
+      if(visibleJobs.length===0) renderNextBatch();
+    }
+  }
+  init();
+
+  /* ====== Install Prompt ====== */
+  window.addEventListener("beforeinstallprompt",e=>{
+    e.preventDefault();
+    deferredPrompt=e;
+    document.getElementById("installBtn").style.display="inline-block";
+  });
+  document.getElementById("installBtn").addEventListener("click",async()=>{
+    if(deferredPrompt){
+      deferredPrompt.prompt();
+      const res=await deferredPrompt.userChoice;
+      if(res.outcome==="accepted") console.log("App installed ✅");
+      deferredPrompt=null;
+    }
+  });
+
+  /* ====== Register Service Worker ====== */
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("service-worker.js").then(()=>{
+      console.log("Service Worker Registered ✅");
+    });
+  }
+</script>
+</body>
+</html>
