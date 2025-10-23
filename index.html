@@ -30,6 +30,10 @@
 <div id="badge">🔔 New Jobs Added</div>
 
 <script>
+  // Auto reload every 5 minutes (300000ms)
+setInterval(() => {
+  location.reload();
+}, 300000);
   const container=document.getElementById("container");
   const badge=document.getElementById("badge");
   const cachedKey="govt_jobs_cache";
@@ -167,6 +171,7 @@
 </script>
 </body>
 </html>
+
 
 
 
