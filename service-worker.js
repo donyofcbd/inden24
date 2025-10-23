@@ -1,46 +1,62 @@
-const CACHE_NAME = "govt-jobs-v2";
-const STATIC_ASSETS = [
-  "./",
-  "./index.html",
-  "./manifest.json",
-  "./icon-192.png",
-  "./icon-512.png"
+const CACHE_NAME = "govt-jobs-cache-v1";
+const urlsToCache = [
+  "/",
+  "/index.html",
+  "/manifest.json",
+  "/icon-192.png",
+  "/icon-512.png"
 ];
 
+// ✅ Install event — cache essential files
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+    caches.open(CACHE_NAME).then((cache) => {
+      console.log("📦 Caching app shell...");
+      return cache.addAll(urlsToCache);
+    })
   );
+  self.skipWaiting();
 });
 
+// ✅ Activate event — clean old cache
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.map((key) => key !== CACHE_NAME && caches.delete(key)))
-    )
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames
+          .filter((name) => name !== CACHE_NAME)
+          .map((name) => caches.delete(name))
+      );
+    })
   );
-  self.clients.claim();
+  console.log("✅ Service Worker activated.");
 });
 
+// ✅ Fetch event — Network first, then cache fallback
 self.addEventListener("fetch", (event) => {
-  const url = event.request.url;
+  const request = event.request;
 
-  // Network-first for API JSON
-  if (url.includes("bd-jobs-feed.vercel.app/api")) {
-    event.respondWith(
-      fetch(event.request)
-        .then((res) => {
-          const resClone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resClone));
-          return res;
-        })
-        .catch(() => caches.match(event.request))
-    );
-    return;
-  }
-
-  // Cache-first for static assets
+  // Try Network first
   event.respondWith(
-    caches.match(event.request).then((res) => res || fetch(event.request))
+    fetch(request)
+      .then((response) => {
+        // Clone and store in cache
+        const responseClone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(request, responseClone);
+        });
+        return response;
+      })
+      .catch(() => {
+        // If offline, try cache
+        return caches.match(request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          } else if (request.destination === "document") {
+            // fallback for offline
+            return caches.match("/index.html");
+          }
+        });
+      })
   );
 });
