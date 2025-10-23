@@ -5,15 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BD Government Jobs</title>
   <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#006644">
-<link rel="icon" href="icon-192.png" type="image/png">
+  <meta name="theme-color" content="#006644">
+  <link rel="icon" href="icon-192.png" type="image/png">
   <style>
-    body{font-family:sans-serif;margin:0;padding:0;background:#f5f5f5;color:#222;}
-    header{background:#006747;color:#fff;text-align:center;padding:10px 0;position:sticky;top:0;z-index:100;}
-    #installBtn{display:none;margin-top:10px;background:#ffcc00;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;}
-    #badge{display:none;position:fixed;bottom:20px;right:20px;background:#ff4747;color:#fff;padding:10px 16px;
+    body {font-family:sans-serif;margin:0;padding:0;background:#f5f5f5;color:#222;}
+    header {background:#006747;color:#fff;text-align:center;padding:10px 0;position:sticky;top:0;z-index:100;}
+    #installBtn {display:none;margin-top:10px;background:#ffcc00;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;}
+    #badge {display:none;position:fixed;bottom:20px;right:20px;background:#ff4747;color:#fff;padding:10px 16px;
       border-radius:30px;box-shadow:0 2px 10px rgba(0,0,0,0.3);font-weight:bold;cursor:pointer;}
-    .job-card{background:#fff;margin:10px;padding:10px;border-radius:10px;box-shadow:0 2px 4px rgba(0,0,0,0.1);}
+    .job-card {background:#fff;margin:10px;padding:10px;border-radius:10px;
+      box-shadow:0 2px 4px rgba(0,0,0,0.1);}
   </style>
 </head>
 <body>
@@ -30,149 +31,140 @@
 <div id="badge">🔔 New Jobs Added</div>
 
 <script>
-  // Auto reload every 5 minutes (300000ms)
-setInterval(() => {
-  location.reload();
-}, 300000);
-  const container=document.getElementById("container");
-  const badge=document.getElementById("badge");
-  const cachedKey="govt_jobs_cache";
-  let allJobs=[],visibleJobs=[],io,deferredPrompt;
+/* ===== Blogger Feed Config ===== */
+const label = "Government Post";
+const FEED_URL = `https://inden24.blogspot.com/feeds/posts/default/-/${encodeURIComponent(label)}?alt=json&max-results=200`;
+const container = document.getElementById("container");
+const badge = document.getElementById("badge");
+const cachedKey = "govt_jobs_cache_v2";
+let allJobs = [], visibleJobs = [], deferredPrompt;
 
-  /* ===== Fake Fetch Function (Replace With Real API) ===== */
-  async function fetchGovtJobs(){
-    const res=await fetch("https://bd-jobs-feed.vercel.app/api"); // ← তোমার API URL এখানে বসাও
-    return await res.json();
+/* ===== Fetch Jobs from Blogger ===== */
+async function fetchGovtJobs(){
+  try {
+    const res = await fetch(FEED_URL);
+    const data = await res.json();
+    const entries = data.feed.entry || [];
+    return entries.map(e => ({
+      id: e.id.$t,
+      title: e.title.$t,
+      link: e.link.find(l => l.rel === "alternate").href,
+      date: e.published.$t,
+      dept: (e.category && e.category.length) ? e.category[0].term : "Government Post",
+      location: "Bangladesh"
+    }));
+  } catch (err) {
+    console.error("Fetch error:", err);
+    return [];
   }
+}
 
-  function renderNextBatch(){
-    const slice=allJobs.slice(visibleJobs.length,visibleJobs.length+20);
-    slice.forEach(job=>{
-      const div=document.createElement("div");
-      div.className="job-card";
-      div.innerHTML=`<h3>${job.title}</h3><p>${job.dept||""}</p><p>📍 ${job.location||"N/A"}</p>`;
-      container.appendChild(div);
-    });
-    visibleJobs=[...visibleJobs,...slice];
-  }
-
-  function saveCache(data){
-    localStorage.setItem(cachedKey,JSON.stringify({time:Date.now(),jobs:data}));
-  }
-  function loadCache(){
-    try{return JSON.parse(localStorage.getItem(cachedKey));}catch{return null;}
-  }
-
-  /* ====== Search ====== */
-  document.getElementById("searchBox2").addEventListener("input",()=>{
-    const s=document.getElementById("searchBox2").value.toLowerCase();
-    const filtered=allJobs.filter(j=>j.title.toLowerCase().includes(s));
-    container.innerHTML="";
-    visibleJobs=[];
-    filtered.forEach(j=>{
-      const div=document.createElement("div");
-      div.className="job-card";
-      div.innerHTML=`<h3>${j.title}</h3><p>${j.dept||""}</p><p>📍 ${j.location||"N/A"}</p>`;
-      container.appendChild(div);
-    });
+/* ===== Render Jobs ===== */
+function renderJobs(list){
+  container.innerHTML = "";
+  list.forEach(job => {
+    const div = document.createElement("div");
+    div.className = "job-card";
+    div.innerHTML = `
+      <h3><a href="${job.link}" target="_blank">${job.title}</a></h3>
+      <p>🏛️ ${job.dept}</p>
+      <p>📅 ${new Date(job.date).toLocaleDateString()}</p>
+      <p>📍 ${job.location}</p>
+    `;
+    container.appendChild(div);
   });
+}
 
-  /* ====== Search Button ====== */
-  document.getElementById("searchBtn2").onclick=()=>{
-    const s=document.getElementById("searchBox2").value.toLowerCase();
-    const filtered=allJobs.filter(j=>j.title.toLowerCase().includes(s));
-    container.innerHTML="";
-    visibleJobs=[];
-    filtered.forEach(j=>{
-      const div=document.createElement("div");
-      div.className="job-card";
-      div.innerHTML=`<h3>${j.title}</h3><p>${j.dept||""}</p><p>📍 ${j.location||"N/A"}</p>`;
-      container.appendChild(div);
-    });
-  };
+/* ===== Cache System ===== */
+function saveCache(data){
+  localStorage.setItem(cachedKey, JSON.stringify({ time: Date.now(), jobs: data }));
+}
+function loadCache(){
+  try { return JSON.parse(localStorage.getItem(cachedKey)); } catch { return null; }
+}
 
-  /* ====== Refresh Button ====== */
-  document.getElementById("refreshBtn2").onclick=async()=>{
-    const fresh=await fetchGovtJobs();
-    if(fresh&&fresh.length){
-      allJobs=fresh;
+/* ===== Search ===== */
+document.getElementById("searchBtn2").onclick = () => {
+  const s = document.getElementById("searchBox2").value.toLowerCase();
+  const filtered = allJobs.filter(j => j.title.toLowerCase().includes(s));
+  renderJobs(filtered);
+};
+document.getElementById("searchBox2").addEventListener("input", () => {
+  const s = document.getElementById("searchBox2").value.toLowerCase();
+  const filtered = allJobs.filter(j => j.title.toLowerCase().includes(s));
+  renderJobs(filtered);
+});
+
+/* ===== Refresh ===== */
+document.getElementById("refreshBtn2").onclick = async () => {
+  const fresh = await fetchGovtJobs();
+  if(fresh && fresh.length){
+    allJobs = fresh;
+    saveCache(allJobs);
+    renderJobs(allJobs);
+  }
+};
+
+/* ===== Auto Update & New Jobs Badge ===== */
+async function autoUpdate(){
+  try {
+    const fresh = await fetchGovtJobs();
+    if(!fresh || !fresh.length) return;
+    const oldIds = new Set(allJobs.map(j => j.id));
+    const newOnes = fresh.filter(j => !oldIds.has(j.id));
+    if(newOnes.length > 0){
+      allJobs = fresh;
       saveCache(allJobs);
-      container.innerHTML="";
-      visibleJobs=[];
-      renderNextBatch();
+      badge.style.display = "block";
+      badge.onclick = () => {
+        badge.style.display = "none";
+        renderJobs(allJobs);
+      };
     }
-  };
+  } catch(err){ console.log("Auto update failed:", err); }
+}
+setInterval(autoUpdate, 5 * 60 * 1000); // 5 minutes
 
-  /* ====== Auto Update Every 5 Minutes ====== */
-  async function autoUpdate(){
-    try{
-      const fresh=await fetchGovtJobs();
-      if(!fresh||!fresh.length)return;
-      const oldIds=new Set(allJobs.map(j=>j.id));
-      const newOnes=fresh.filter(j=>!oldIds.has(j.id));
-      if(newOnes.length>0){
-        allJobs=fresh;
-        saveCache(allJobs);
-        badge.style.display="block"; // 🔔 Show badge
-        badge.onclick=()=>{
-          badge.style.display="none";
-          container.innerHTML="";
-          visibleJobs=[];
-          renderNextBatch();
-        };
-      }
-    }catch(err){console.log("Auto update failed:",err);}
+/* ===== Initial Load ===== */
+async function init(){
+  const cached = loadCache();
+  if(cached && cached.jobs && cached.jobs.length){
+    allJobs = cached.jobs;
+    renderJobs(allJobs);
   }
-  setInterval(autoUpdate,5*60*1000);
-
-  /* ===== Initial Load ===== */
-  async function init(){
-    const cached=loadCache();
-    if(cached&&cached.jobs&&cached.jobs.length){
-      allJobs=cached.jobs;
-      renderNextBatch();
-    }
-    const fresh=await fetchGovtJobs();
-    if(fresh&&fresh.length){
-      allJobs=fresh; saveCache(allJobs);
-      if(visibleJobs.length===0) renderNextBatch();
-    }
+  const fresh = await fetchGovtJobs();
+  if(fresh && fresh.length){
+    allJobs = fresh;
+    saveCache(allJobs);
+    renderJobs(allJobs);
   }
-  init();
+}
+init();
 
-  /* ====== Install Prompt ====== */
-  window.addEventListener("beforeinstallprompt",e=>{
-    e.preventDefault();
-    deferredPrompt=e;
-    document.getElementById("installBtn").style.display="inline-block";
-  });
-  document.getElementById("installBtn").addEventListener("click",async()=>{
-    if(deferredPrompt){
-      deferredPrompt.prompt();
-      const res=await deferredPrompt.userChoice;
-      if(res.outcome==="accepted") console.log("App installed ✅");
-      deferredPrompt=null;
-    }
-  });
+/* ===== Install Prompt ===== */
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById("installBtn").style.display = "inline-block";
+});
+document.getElementById("installBtn").addEventListener("click", async () => {
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    const res = await deferredPrompt.userChoice;
+    if(res.outcome === "accepted") console.log("App installed ✅");
+    deferredPrompt = null;
+  }
+});
 
-  /* ====== Register Service Worker ====== */
- if ('serviceWorker' in navigator) {
+/* ===== Service Worker ===== */
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('service-worker.js')
-      .then(reg => {
-        console.log('✅ Service Worker registered successfully:', reg.scope);
-      })
-      .catch(err => {
-        console.error('❌ Service Worker registration failed:', err);
-      });
+    navigator.serviceWorker.register('service-worker.js')
+      .then(reg => console.log('✅ Service Worker Registered:', reg.scope))
+      .catch(err => console.error('❌ Registration Failed:', err));
   });
 }
 </script>
+
 </body>
 </html>
-
-
-
-
-
