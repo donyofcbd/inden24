@@ -1,10 +1,10 @@
 {
   "name": "BD Government Jobs",
-  "short_name": "GovtJobs",
-  "start_url": "./",
+  "short_name": "BD Govt Jobs",
+  "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#006747",
-  "theme_color": "#006747",
+  "background_color": "#006644",
+  "theme_color": "#006644",
   "icons": [
     {
       "src": "icon-192.png",
@@ -18,4 +18,5 @@
     }
   ]
 }
+
 
